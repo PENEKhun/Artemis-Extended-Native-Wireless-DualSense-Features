@@ -27,7 +27,11 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicReference
 
 @RequiresApi(Build.VERSION_CODES.P)
-class DirectDualSenseBtHidBridge(context: Context)
+class DirectDualSenseBtHidBridge(
+    context: Context,
+    private val deviceMatcher: ((BluetoothDevice) -> Boolean)? = null,
+    private val deviceLabel: String = "DualSense-like",
+)
 {
     companion object
     {
@@ -340,7 +344,7 @@ class DirectDualSenseBtHidBridge(context: Context)
         if(isClosed) return failedResult("Bridge is closed")
         refreshConnectedDevices(logChanges = false)
         val proxy = profileProxy ?: return failedResult("HID host proxy is not ready")
-        val device = selectedDevice ?: return failedResult("No connected DualSense-like HID device found")
+        val device = selectedDevice ?: return failedResult("No connected $deviceLabel HID device found")
         val reportId = reportBytes.firstOrNull()?.toInt()?.and(0xFF) ?: -1
         registerReportReceiver()
         appendLog("Prepared ${reportBytes.size} feature bytes for report 0x${"%02X".format(reportId)}: ${reportBytes.previewHex(12)}")
@@ -480,7 +484,7 @@ class DirectDualSenseBtHidBridge(context: Context)
             return ReportResult(false, reportId, reportType.toInt() and 0xFF, null, "Bridge is closed")
         refreshConnectedDevices(logChanges = false)
         val proxy = profileProxy ?: return ReportResult(false, reportId, reportType.toInt() and 0xFF, null, "HID host proxy is not ready")
-        val device = selectedDevice ?: return ReportResult(false, reportId, reportType.toInt() and 0xFF, null, "No connected DualSense-like HID device found")
+        val device = selectedDevice ?: return ReportResult(false, reportId, reportType.toInt() and 0xFF, null, "No connected $deviceLabel HID device found")
         val method = getReportMethod ?: return ReportResult(false, reportId, reportType.toInt() and 0xFF, null, "BluetoothHidHost.getReport unavailable")
         registerReportReceiver()
 
@@ -537,7 +541,7 @@ class DirectDualSenseBtHidBridge(context: Context)
         if(!streaming || selectedDevice == null)
             refreshConnectedDevices(logChanges = !streaming)
         val proxy = profileProxy ?: return failedResult("HID host proxy is not ready", notify = !streaming)
-        val device = selectedDevice ?: return failedResult("No connected DualSense-like HID device found", notify = !streaming)
+        val device = selectedDevice ?: return failedResult("No connected $deviceLabel HID device found", notify = !streaming)
         val reportId = reportBytes.firstOrNull()?.toInt()?.and(0xFF) ?: -1
 
         if(!streaming)
@@ -748,7 +752,8 @@ class DirectDualSenseBtHidBridge(context: Context)
                 emptyList()
             }
         connectedDevices = devices
-        selectedDevice = pickLikelyDualSense(devices) ?: devices.firstOrNull()
+        selectedDevice = deviceMatcher?.let { matcher -> devices.firstOrNull(matcher) }
+            ?: if (deviceMatcher == null) pickLikelyDualSense(devices) ?: devices.firstOrNull() else null
         if(logChanges)
         {
             if(devices.isNotEmpty())
@@ -1331,7 +1336,6 @@ class DirectDualSenseBtHidBridge(context: Context)
         }
     }
 }
-
 
 
 
