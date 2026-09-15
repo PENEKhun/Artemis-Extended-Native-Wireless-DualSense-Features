@@ -35,6 +35,12 @@ object DirectEightBitDoUltimate2Bt {
     @JvmStatic fun isBluetoothUltimate2Input(device: InputDevice?): Boolean =
         device != null && isUltimate2(device.vendorId, device.productId)
 
+    @JvmStatic fun warmUp(context: Context) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && permissionGranted(context)) {
+            bridge?.start()
+        }
+    }
+
     @JvmStatic fun isConnected(context: Context): Boolean {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S || !permissionGranted(context)) return false
         val active = bridge ?: return false
@@ -47,6 +53,8 @@ object DirectEightBitDoUltimate2Bt {
 
     @JvmStatic fun sendRumble(context: Context, lowFrequency: Short, highFrequency: Short): Boolean {
         if (!isConnected(context)) return false
+        LimeLog.info("Ultimate 2 Bluetooth rumble: left=${(lowFrequency.toInt() ushr 8) and 0xff} " +
+            "right=${(highFrequency.toInt() ushr 8) and 0xff}")
         val result = bridge?.sendOutputReport(buildRumbleReport(lowFrequency, highFrequency),
             streaming = true, preferInterrupt = true)
         if (result?.success != true) {

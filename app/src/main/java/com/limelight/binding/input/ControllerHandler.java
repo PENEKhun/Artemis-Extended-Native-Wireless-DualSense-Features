@@ -503,7 +503,11 @@ public class ControllerHandler implements InputManager.InputDeviceListener, UsbD
 
     @Override
     public void onInputDeviceAdded(int deviceId) {
-        // Nothing happening here yet
+        InputDevice device = InputDevice.getDevice(deviceId);
+        if (DirectEightBitDoUltimate2Bt.isBluetoothUltimate2Input(device)) {
+            LimeLog.info("Detected 8BitDo Ultimate 2 Bluetooth controller (2DC8:6012)");
+            DirectEightBitDoUltimate2Bt.warmUp(activityContext);
+        }
     }
 
     @Override
@@ -1008,6 +1012,11 @@ public class ControllerHandler implements InputManager.InputDeviceListener, UsbD
         String devName = dev.getName();
 
         LimeLog.info("Creating controller context for device: "+devName);
+
+        if (DirectEightBitDoUltimate2Bt.isBluetoothUltimate2Input(dev)) {
+            LimeLog.info("Detected 8BitDo Ultimate 2 Bluetooth controller (2DC8:6012)");
+            DirectEightBitDoUltimate2Bt.warmUp(activityContext);
+        }
         LimeLog.info("Vendor ID: " + dev.getVendorId());
         LimeLog.info("Product ID: "+dev.getProductId());
         LimeLog.info(dev.toString());
