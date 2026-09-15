@@ -53,6 +53,7 @@ import com.example.usbbtonandroid.DualSenseTouchPoint;
 import com.limelight.dualsense.DualSenseBridge;
 import com.limelight.dualsense.DualSenseWiredOutput;
 import com.limelight.dualsense.DirectDualSenseBt;
+import com.limelight.dualsense.DirectEightBitDoUltimate2Bt;
 import com.limelight.nvstream.input.MouseButtonPacket;
 import com.limelight.nvstream.jni.MoonBridge;
 import com.limelight.preferences.PreferenceConfiguration;
@@ -548,6 +549,7 @@ public class ControllerHandler implements InputManager.InputDeviceListener, UsbD
         stopped = true;
         dualSenseBridgeStreamConnected = false;
         DualSenseBridge.setStreamActive(false);
+        DirectEightBitDoUltimate2Bt.stopRumble(activityContext);
         DualSenseBridge.removeInputListener(dualSenseBridgeInputListener);
         mainThreadHandler.removeCallbacks(dualSenseBridgeFailsafeRunnable);
         mainThreadHandler.removeCallbacks(dualSenseBridgeStreamWatchdogRunnable);
@@ -3744,6 +3746,13 @@ public class ControllerHandler implements InputManager.InputDeviceListener, UsbD
                         DirectDualSenseBt.isConnected(activityContext)) {
                     vibrated = DirectDualSenseBt.sendRumble(activityContext,
                             lowFreqMotor, highFreqMotor);
+                    continue;
+                }
+
+                if (DirectEightBitDoUltimate2Bt.isBluetoothUltimate2Input(deviceContext.inputDevice) &&
+                        DirectEightBitDoUltimate2Bt.sendRumble(activityContext,
+                                lowFreqMotor, highFreqMotor)) {
+                    vibrated = true;
                     continue;
                 }
 

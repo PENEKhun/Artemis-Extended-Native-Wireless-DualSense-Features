@@ -8,6 +8,7 @@ import com.limelight.dualsense.DualSenseBridge;
 import com.limelight.dualsense.DualSenseAudioBridge;
 import com.limelight.dualsense.DualSenseWiredOutput;
 import com.limelight.dualsense.DirectDualSenseBt;
+import com.limelight.dualsense.DirectEightBitDoUltimate2Bt;
 
 public class ArtemisApplication extends Application {
     @Override
@@ -17,6 +18,7 @@ public class ArtemisApplication extends Application {
         DualSenseAudioBridge.initialize(this);
         DualSenseWiredOutput.initialize(this);
         DirectDualSenseBt.initialize(this);
+        DirectEightBitDoUltimate2Bt.initialize(this);
         ProfilesManager profilesManager = ProfilesManager.getInstance();
         if (!profilesManager.load(this)) {
             Toast.makeText(this, R.string.profile_manager_failed_to_load, Toast.LENGTH_LONG).show();

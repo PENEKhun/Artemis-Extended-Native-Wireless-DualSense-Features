@@ -56,6 +56,8 @@ object DirectEightBitDoUltimate2Bt {
         return true
     }
 
+    @JvmStatic fun stopRumble(context: Context): Boolean = sendRumble(context, 0, 0)
+
     @JvmStatic fun buildRumbleReport(lowFrequency: Short, highFrequency: Short): ByteArray = byteArrayOf(
         0x05,
         (lowFrequency.toInt() ushr 8).toByte(),
