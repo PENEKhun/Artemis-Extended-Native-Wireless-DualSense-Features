@@ -21,4 +21,10 @@ class DirectEightBitDoUltimate2BtTest {
         assertArrayEquals(byteArrayOf(0x05, 0x00, 0x00, 0x00, 0x00),
             DirectEightBitDoUltimate2Bt.buildRumbleReport(0, 0))
     }
+
+    @Test fun extractsTheBluetoothAddressThatIdentifiesEachController() {
+        assertTrue(DirectEightBitDoUltimate2Bt.bluetoothAddressFromInputDescription(
+            "Input Device 4: 8BitDo Ultimate 2 bluetoothAddress=AA:BB:CC:DD:EE:FF") ==
+                "AA:BB:CC:DD:EE:FF")
+    }
 }

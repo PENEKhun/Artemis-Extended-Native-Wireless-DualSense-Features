@@ -3760,7 +3760,7 @@ public class ControllerHandler implements InputManager.InputDeviceListener, UsbD
 
                 if (DirectEightBitDoUltimate2Bt.isBluetoothUltimate2Input(deviceContext.inputDevice) &&
                         DirectEightBitDoUltimate2Bt.sendRumble(activityContext,
-                                lowFreqMotor, highFreqMotor)) {
+                                deviceContext.inputDevice, lowFreqMotor, highFreqMotor)) {
                     vibrated = true;
                     continue;
                 }

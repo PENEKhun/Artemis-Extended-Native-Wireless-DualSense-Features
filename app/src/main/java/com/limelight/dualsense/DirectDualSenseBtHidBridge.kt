@@ -535,13 +535,18 @@ class DirectDualSenseBtHidBridge(
         streaming: Boolean = false,
         preferInterrupt: Boolean? = null,
         transportMode: OutputTransportMode = OutputTransportMode.AUTO,
+        targetDeviceAddress: String? = null,
     ): SendResult
     {
         if(isClosed) return failedResult("Bridge is closed", notify = false)
-        if(!streaming || selectedDevice == null)
+        if(!streaming || selectedDevice == null || targetDeviceAddress != null)
             refreshConnectedDevices(logChanges = !streaming)
         val proxy = profileProxy ?: return failedResult("HID host proxy is not ready", notify = !streaming)
-        val device = selectedDevice ?: return failedResult("No connected $deviceLabel HID device found", notify = !streaming)
+        val device = if(targetDeviceAddress == null) selectedDevice else connectedDevices.firstOrNull {
+            it.address.equals(targetDeviceAddress, ignoreCase = true)
+        }
+        if(device == null)
+            return failedResult("No connected $deviceLabel HID device found", notify = !streaming)
         val reportId = reportBytes.firstOrNull()?.toInt()?.and(0xFF) ?: -1
 
         if(!streaming)
@@ -580,6 +585,14 @@ class DirectDualSenseBtHidBridge(
         if(!streaming)
             notifyStatusChanged()
         return failedResult(lastError ?: attempts.last().message, notify = !streaming)
+    }
+
+    @SuppressLint("MissingPermission")
+    fun getMatchingDeviceAddresses(): List<String>
+    {
+        refreshConnectedDevices(logChanges = false)
+        return connectedDevices.filter { deviceMatcher?.invoke(it) ?: true }
+            .mapNotNull { it.address }
     }
 
     @SuppressLint("MissingPermission")
@@ -1336,6 +1349,5 @@ class DirectDualSenseBtHidBridge(
         }
     }
 }
-
 
 

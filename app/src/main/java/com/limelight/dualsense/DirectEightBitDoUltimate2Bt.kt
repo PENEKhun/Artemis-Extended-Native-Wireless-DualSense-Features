@@ -14,6 +14,7 @@ import com.limelight.LimeLog
 object DirectEightBitDoUltimate2Bt {
     const val VENDOR_ID = 0x2dc8
     const val PRODUCT_ID = 0x6012
+    private val inputDeviceBluetoothAddressRegex = Regex("bluetoothAddress=([0-9A-Fa-f:]{17})")
 
     private val lock = Any()
     private var bridge: DirectDualSenseBtHidBridge? = null
@@ -51,20 +52,43 @@ object DirectEightBitDoUltimate2Bt {
             (refreshed.sendDataReady || refreshed.setReportReady)
     }
 
-    @JvmStatic fun sendRumble(context: Context, lowFrequency: Short, highFrequency: Short): Boolean {
+    @JvmStatic fun sendRumble(
+        context: Context,
+        inputDevice: InputDevice?,
+        lowFrequency: Short,
+        highFrequency: Short,
+    ): Boolean {
+        val address = bluetoothAddress(inputDevice) ?: run {
+            LimeLog.warning("Ultimate 2 Bluetooth rumble skipped: controller Bluetooth address unavailable")
+            return false
+        }
+        return sendRumbleToAddress(context, address, lowFrequency, highFrequency)
+    }
+
+    @JvmStatic fun stopRumble(context: Context): Boolean {
+        val addresses = bridge?.getMatchingDeviceAddresses().orEmpty()
+        return addresses.isNotEmpty() && addresses.all {
+            sendRumbleToAddress(context, it, 0, 0)
+        }
+    }
+
+    private fun sendRumbleToAddress(
+        context: Context,
+        address: String,
+        lowFrequency: Short,
+        highFrequency: Short,
+    ): Boolean {
         if (!isConnected(context)) return false
         LimeLog.info("Ultimate 2 Bluetooth rumble: left=${(lowFrequency.toInt() ushr 8) and 0xff} " +
-            "right=${(highFrequency.toInt() ushr 8) and 0xff}")
+            "right=${(highFrequency.toInt() ushr 8) and 0xff} device=$address")
         val result = bridge?.sendOutputReport(buildRumbleReport(lowFrequency, highFrequency),
-            streaming = true, preferInterrupt = true)
+            streaming = true, preferInterrupt = true, targetDeviceAddress = address)
         if (result?.success != true) {
             LimeLog.warning("Ultimate 2 Bluetooth rumble failed: ${result?.message ?: "HID bridge unavailable"}")
             return false
         }
         return true
     }
-
-    @JvmStatic fun stopRumble(context: Context): Boolean = sendRumble(context, 0, 0)
 
     @JvmStatic fun buildRumbleReport(lowFrequency: Short, highFrequency: Short): ByteArray = byteArrayOf(
         0x05,
@@ -81,4 +105,10 @@ object DirectEightBitDoUltimate2Bt {
     private fun isUltimate2BluetoothDevice(device: android.bluetooth.BluetoothDevice): Boolean =
         runCatching { device.name?.contains("8BitDo Ultimate 2", ignoreCase = true) == true }
             .getOrDefault(false)
+
+    @JvmStatic fun bluetoothAddressFromInputDescription(description: String): String? =
+        inputDeviceBluetoothAddressRegex.find(description)?.groupValues?.get(1)?.uppercase()
+
+    private fun bluetoothAddress(inputDevice: InputDevice?): String? =
+        inputDevice?.let { bluetoothAddressFromInputDescription(it.toString()) }
 }
