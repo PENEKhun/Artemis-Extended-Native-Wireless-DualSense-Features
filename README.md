@@ -28,6 +28,25 @@ DualSense functionality is available through both wired and wireless connections
 
 The controller maintains its lighting, trigger, audio, haptic, rumble, touchpad, and motion state simultaneously while streaming.
 
+## 🎮 8BitDo Ultimate 2 Bluetooth Rumble
+
+Artemis Extended can forward conventional game rumble to an **8BitDo Ultimate 2 Wireless** paired directly over Bluetooth on Android 12 or newer. The first supported device is Steam-mode Bluetooth VID/PID `2DC8:6012`.
+
+- Pair the controller normally in Android Bluetooth settings, then use it as the Artemis gamepad.
+- Apollo Extended (and hosts that emit standard Moonlight rumble packets) require no controller-specific host setting.
+- Artemis selects only a connected Bluetooth HID device named `8BitDo Ultimate 2`; other controllers keep the existing Android vibrator path.
+- Rumble is stopped when the stream input handler closes.
+
+This path uses Android's hidden HID-host output API, which is already used by the direct Bluetooth DualSense implementation. Android TV vendor Bluetooth stacks may still block that API; physical verification is required on the target TV and controller firmware.
+
+For diagnostics, run:
+
+```bash
+adb logcat | grep -i 'Ultimate 2'
+```
+
+Expected entries include detection of `2DC8:6012`, each left/right rumble value, and any HID output failure. Test left, right, both, and stop feedback from a game or XInput rumble test, then verify that disconnecting the stream immediately stops vibration.
+
 ### Connection support
 
 - **Android 12+ Bluetooth:** Connect the DualSense directly to the Android device without an external adapter.
