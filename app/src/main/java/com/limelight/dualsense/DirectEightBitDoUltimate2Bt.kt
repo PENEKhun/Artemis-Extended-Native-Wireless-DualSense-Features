@@ -9,6 +9,7 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.view.InputDevice
 import com.limelight.LimeLog
+import org.lsposed.hiddenapibypass.HiddenApiBypass
 
 /** Sends rumble reports to an Ultimate 2 paired through Android Bluetooth HID. */
 object DirectEightBitDoUltimate2Bt {
@@ -18,12 +19,14 @@ object DirectEightBitDoUltimate2Bt {
 
     private val lock = Any()
     private var bridge: DirectDualSenseBtHidBridge? = null
+    private val fallbackAddressesByInputDeviceId = HashMap<Int, String>()
     @Volatile private var initialized = false
 
     @JvmStatic fun initialize(context: Context) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S || initialized) return
         synchronized(lock) {
             if (initialized) return
+            HiddenApiBypass.addHiddenApiExemptions("Landroid/view/InputDevice;")
             bridge = DirectDualSenseBtHidBridge(context.applicationContext,
                 ::isUltimate2BluetoothDevice, "8BitDo Ultimate 2")
             initialized = true
@@ -58,7 +61,7 @@ object DirectEightBitDoUltimate2Bt {
         lowFrequency: Short,
         highFrequency: Short,
     ): Boolean {
-        val address = bluetoothAddress(inputDevice) ?: run {
+        val address = bluetoothAddress(inputDevice) ?: fallbackBluetoothAddress(inputDevice) ?: run {
             LimeLog.warning("Ultimate 2 Bluetooth rumble skipped: controller Bluetooth address unavailable")
             return false
         }
@@ -67,9 +70,13 @@ object DirectEightBitDoUltimate2Bt {
 
     @JvmStatic fun stopRumble(context: Context): Boolean {
         val addresses = bridge?.getMatchingDeviceAddresses().orEmpty()
-        return addresses.isNotEmpty() && addresses.all {
+        val stopped = addresses.isNotEmpty() && addresses.all {
             sendRumbleToAddress(context, it, 0, 0)
         }
+        synchronized(lock) {
+            fallbackAddressesByInputDeviceId.clear()
+        }
+        return stopped
     }
 
     private fun sendRumbleToAddress(
@@ -109,6 +116,27 @@ object DirectEightBitDoUltimate2Bt {
     @JvmStatic fun bluetoothAddressFromInputDescription(description: String): String? =
         inputDeviceBluetoothAddressRegex.find(description)?.groupValues?.get(1)?.uppercase()
 
-    private fun bluetoothAddress(inputDevice: InputDevice?): String? =
-        inputDevice?.let { bluetoothAddressFromInputDescription(it.toString()) }
+    private fun bluetoothAddress(inputDevice: InputDevice?): String? {
+        if (inputDevice == null) return null
+
+        return runCatching {
+            HiddenApiBypass.invoke(InputDevice::class.java, inputDevice, "getBluetoothAddress") as? String
+        }.getOrNull()?.uppercase() ?: bluetoothAddressFromInputDescription(inputDevice.toString())
+    }
+
+    private fun fallbackBluetoothAddress(inputDevice: InputDevice?): String? {
+        if (inputDevice == null) return null
+
+        synchronized(lock) {
+            val addresses = bridge?.getMatchingDeviceAddresses().orEmpty()
+            fallbackAddressesByInputDeviceId.entries.removeAll { it.value !in addresses }
+            val address = fallbackAddressesByInputDeviceId[inputDevice.id]
+                ?: addresses.firstOrNull { it !in fallbackAddressesByInputDeviceId.values }?.also {
+                    fallbackAddressesByInputDeviceId[inputDevice.id] = it
+                    LimeLog.warning("Ultimate 2 Bluetooth rumble using fallback device mapping: " +
+                        "input=${inputDevice.id} device=$it")
+                }
+            return address
+        }
+    }
 }
