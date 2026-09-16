@@ -27,4 +27,11 @@ class DirectEightBitDoUltimate2BtTest {
             "Input Device 4: 8BitDo Ultimate 2 bluetoothAddress=AA:BB:CC:DD:EE:FF") ==
                 "AA:BB:CC:DD:EE:FF")
     }
+
+    @Test fun assignsFallbackAddressesByControllerNumberNotRumbleOrder() {
+        val addresses = listOf("AA:AA:AA:AA:AA:01", "AA:AA:AA:AA:AA:02")
+        assertTrue(DirectEightBitDoUltimate2Bt.fallbackAddressForController(0, addresses) == addresses[0])
+        assertTrue(DirectEightBitDoUltimate2Bt.fallbackAddressForController(1, addresses) == addresses[1])
+        assertTrue(DirectEightBitDoUltimate2Bt.fallbackAddressForController(-1, addresses) == null)
+    }
 }

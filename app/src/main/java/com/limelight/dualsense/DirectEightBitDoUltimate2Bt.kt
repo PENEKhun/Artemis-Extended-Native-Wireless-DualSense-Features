@@ -19,7 +19,7 @@ object DirectEightBitDoUltimate2Bt {
 
     private val lock = Any()
     private var bridge: DirectDualSenseBtHidBridge? = null
-    private val fallbackAddressesByInputDeviceId = HashMap<Int, String>()
+    private val fallbackAddressesByControllerNumber = HashMap<Short, String>()
     @Volatile private var initialized = false
 
     @JvmStatic fun initialize(context: Context) {
@@ -57,11 +57,15 @@ object DirectEightBitDoUltimate2Bt {
 
     @JvmStatic fun sendRumble(
         context: Context,
+        controllerNumber: Short,
         inputDevice: InputDevice?,
         lowFrequency: Short,
         highFrequency: Short,
     ): Boolean {
-        val address = bluetoothAddress(inputDevice) ?: fallbackBluetoothAddress(inputDevice) ?: run {
+        if (!isConnected(context)) return false
+        val addresses = bridge?.getMatchingDeviceAddresses().orEmpty().map(String::uppercase)
+        val address = bluetoothAddress(inputDevice)?.takeIf { it in addresses }
+            ?: fallbackBluetoothAddress(controllerNumber, addresses) ?: run {
             LimeLog.warning("Ultimate 2 Bluetooth rumble skipped: controller Bluetooth address unavailable")
             return false
         }
@@ -74,7 +78,7 @@ object DirectEightBitDoUltimate2Bt {
             sendRumbleToAddress(context, it, 0, 0)
         }
         synchronized(lock) {
-            fallbackAddressesByInputDeviceId.clear()
+            fallbackAddressesByControllerNumber.clear()
         }
         return stopped
     }
@@ -124,19 +128,21 @@ object DirectEightBitDoUltimate2Bt {
         }.getOrNull()?.uppercase() ?: bluetoothAddressFromInputDescription(inputDevice.toString())
     }
 
-    private fun fallbackBluetoothAddress(inputDevice: InputDevice?): String? {
-        if (inputDevice == null) return null
-
+    private fun fallbackBluetoothAddress(controllerNumber: Short, addresses: List<String>): String? {
         synchronized(lock) {
-            val addresses = bridge?.getMatchingDeviceAddresses().orEmpty()
-            fallbackAddressesByInputDeviceId.entries.removeAll { it.value !in addresses }
-            val address = fallbackAddressesByInputDeviceId[inputDevice.id]
-                ?: addresses.firstOrNull { it !in fallbackAddressesByInputDeviceId.values }?.also {
-                    fallbackAddressesByInputDeviceId[inputDevice.id] = it
+            fallbackAddressesByControllerNumber.entries.removeAll { it.value !in addresses }
+            val address = fallbackAddressesByControllerNumber[controllerNumber]
+                ?: fallbackAddressForController(controllerNumber, addresses)?.also {
+                    fallbackAddressesByControllerNumber[controllerNumber] = it
                     LimeLog.warning("Ultimate 2 Bluetooth rumble using fallback device mapping: " +
-                        "input=${inputDevice.id} device=$it")
+                        "controller=$controllerNumber device=$it")
                 }
             return address
         }
     }
+
+    @JvmStatic internal fun fallbackAddressForController(
+        controllerNumber: Short,
+        addresses: List<String>,
+    ): String? = addresses.getOrNull(controllerNumber.toInt())
 }
