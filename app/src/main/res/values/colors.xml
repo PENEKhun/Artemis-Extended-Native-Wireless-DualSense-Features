@@ -1,4 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="profileAccent">#FF4081</color>
+    <color name="penek_surface">#15121A</color>
+    <color name="penek_accent">#B99AFF</color>
+    <color name="profileAccent">@color/penek_accent</color>
 </resources>

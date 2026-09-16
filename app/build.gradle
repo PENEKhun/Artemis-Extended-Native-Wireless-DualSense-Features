@@ -109,9 +109,9 @@ android {
     buildTypes {
         debug {
             applicationIdSuffix ".ultimate2tv"
-            resValue "string", "app_label", "Artemis Ultimate 2"
-            resValue "string", "app_label_root", "Artemis Ultimate 2 (Root)"
-            resValue "string", "app_label_game", "Artemis Ultimate 2 (Game)"
+            resValue "string", "app_label", "Penek Artemis"
+            resValue "string", "app_label_root", "Penek Artemis (Root)"
+            resValue "string", "app_label_game", "Penek Artemis (Game)"
 
             minifyEnabled true
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
@@ -148,9 +148,9 @@ android {
             //
             // TL;DR: Leave the following line alone!
             applicationIdSuffix ".noir"
-            resValue "string", "app_label", "Artemis"
-            resValue "string", "app_label_root", "Artemis (Root)"
-            resValue "string", "app_label_game", "Artemis (Game)"
+            resValue "string", "app_label", "Penek Artemis"
+            resValue "string", "app_label_root", "Penek Artemis (Root)"
+            resValue "string", "app_label_game", "Penek Artemis (Game)"
 
             minifyEnabled true
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'

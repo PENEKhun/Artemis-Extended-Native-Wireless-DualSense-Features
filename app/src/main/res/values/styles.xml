@@ -19,10 +19,12 @@
         <!-- All customizations that are NOT specific to a particular API-level can go here. -->
         <item name="android:windowActionBar">false</item>
         <item name="android:windowNoTitle">true</item>
-        <item name="android:statusBarColor">#1A1A1A</item>
-        <item name="android:navigationBarColor">#1A1A1A</item>
-        <item name="android:colorBackground">#1A1A1A</item>
-        <item name="android:windowBackground">#1A1A1A</item>
+        <item name="android:statusBarColor">@color/penek_surface</item>
+        <item name="android:navigationBarColor">@color/penek_surface</item>
+        <item name="android:colorBackground">@color/penek_surface</item>
+        <item name="android:windowBackground">@color/penek_surface</item>
+        <item name="colorPrimary">@color/penek_accent</item>
+        <item name="colorSecondary">@color/penek_accent</item>
     </style>
 
     <style name="StreamBaseTheme" parent="AppBaseTheme">

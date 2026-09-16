@@ -102,7 +102,7 @@
     <string name="summary_checkbox_show_onscreen_controls">터치스크린에 가상 컨트롤러 오버레이를 표시합니다</string>
     <string name="category_ui_settings">UI 설정</string>
     <string name="title_language_list">언어</string>
-    <string name="summary_language_list">Moonlight에서 사용할 언어를 선택합니다</string>
+    <string name="summary_language_list">Penek Artemis에서 사용할 언어를 선택합니다</string>
     <string name="title_checkbox_small_icon_mode">작은 아이콘 사용</string>
     <string name="summary_checkbox_small_icon_mode">한 화면에서 더 많은 게임을 볼 수 있게 게임을 더 작게 표시합니다</string>
     <string name="category_host_settings">호스트 설정</string>
