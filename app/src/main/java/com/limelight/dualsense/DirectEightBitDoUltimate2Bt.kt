@@ -5,21 +5,64 @@ package com.limelight.dualsense
 import android.Manifest
 import android.annotation.SuppressLint
 import android.content.Context
+import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.os.Build
 import android.view.InputDevice
 import com.limelight.LimeLog
 import org.lsposed.hiddenapibypass.HiddenApiBypass
+import java.util.concurrent.ConcurrentHashMap
+
+internal interface Ultimate2AddressStore {
+    fun get(descriptor: String): String?
+    fun put(descriptor: String, address: String)
+}
+
+internal class InMemoryUltimate2AddressStore : Ultimate2AddressStore {
+    private val addresses = ConcurrentHashMap<String, String>()
+
+    override fun get(descriptor: String): String? = addresses[descriptor]
+
+    override fun put(descriptor: String, address: String) {
+        addresses[descriptor] = address
+    }
+}
+
+internal class SharedPreferencesUltimate2AddressStore(
+    private val preferences: SharedPreferences,
+) : Ultimate2AddressStore {
+    override fun get(descriptor: String): String? = preferences.getString(descriptor, null)
+
+    @Synchronized override fun put(descriptor: String, address: String) {
+        if (preferences.getString(descriptor, null)?.equals(address, ignoreCase = true) == true) return
+        preferences.edit().putString(descriptor, address).apply()
+    }
+}
+
+internal enum class BluetoothAddressSelectionSource {
+    FRESH_EXACT,
+    REMEMBERED_EXACT,
+    LONE_CONTROLLER_FALLBACK,
+}
+
+internal data class BluetoothAddressSelection(
+    val address: String,
+    val source: BluetoothAddressSelectionSource,
+) {
+    val shouldRemember: Boolean
+        get() = source == BluetoothAddressSelectionSource.FRESH_EXACT
+}
 
 /** Sends rumble reports to an Ultimate 2 paired through Android Bluetooth HID. */
 object DirectEightBitDoUltimate2Bt {
     const val VENDOR_ID = 0x2dc8
     const val PRODUCT_ID = 0x6012
+    private const val ADDRESS_PREFERENCES_NAME = "eight_bit_do_ultimate_2_addresses"
     private val inputDeviceBluetoothAddressRegex = Regex("bluetoothAddress=([0-9A-Fa-f:]{17})")
 
     private val lock = Any()
     private var bridge: DirectDualSenseBtHidBridge? = null
-    private val fallbackAddressesByControllerNumber = HashMap<Short, String>()
+    @Volatile private var addressStore: Ultimate2AddressStore = InMemoryUltimate2AddressStore()
     @Volatile private var initialized = false
 
     @JvmStatic fun initialize(context: Context) {
@@ -27,7 +70,10 @@ object DirectEightBitDoUltimate2Bt {
         synchronized(lock) {
             if (initialized) return
             HiddenApiBypass.addHiddenApiExemptions("Landroid/view/InputDevice;")
-            bridge = DirectDualSenseBtHidBridge(context.applicationContext,
+            val applicationContext = context.applicationContext
+            addressStore = SharedPreferencesUltimate2AddressStore(applicationContext.getSharedPreferences(
+                ADDRESS_PREFERENCES_NAME, Context.MODE_PRIVATE))
+            bridge = DirectDualSenseBtHidBridge(applicationContext,
                 ::isUltimate2BluetoothDevice, "8BitDo Ultimate 2")
             initialized = true
         }
@@ -49,7 +95,7 @@ object DirectEightBitDoUltimate2Bt {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S || !permissionGranted(context)) return false
         val active = bridge ?: return false
         val status = active.getStatus(permissionGranted = true)
-        if (!status.proxyReady) active.start()
+        if (shouldRefreshBridge(status.proxyReady, status.connectedDeviceName)) active.start()
         val refreshed = active.getStatus(permissionGranted = true)
         return refreshed.proxyReady && refreshed.connectedDeviceName != null &&
             (refreshed.sendDataReady || refreshed.setReportReady)
@@ -57,28 +103,33 @@ object DirectEightBitDoUltimate2Bt {
 
     @JvmStatic fun sendRumble(
         context: Context,
-        controllerNumber: Short,
         inputDevice: InputDevice?,
+        ultimate2InputContextCount: Int,
         lowFrequency: Short,
         highFrequency: Short,
     ): Boolean {
         if (!isConnected(context)) return false
         val addresses = bridge?.getMatchingDeviceAddresses().orEmpty().map(String::uppercase)
-        val address = bluetoothAddress(inputDevice)?.takeIf { it in addresses }
-            ?: fallbackBluetoothAddress(controllerNumber, addresses) ?: run {
+        val descriptor = inputDevice?.descriptor
+        val store = addressStore
+        val selection = selectTargetBluetoothAddress(
+            resolvedInputAddress = bluetoothAddress(inputDevice),
+            rememberedAddress = descriptor?.let(store::get),
+            liveAddresses = addresses,
+            ultimate2InputContextCount = ultimate2InputContextCount) ?: run {
             LimeLog.warning("Ultimate 2 Bluetooth rumble skipped: controller Bluetooth address unavailable")
             return false
         }
-        return sendRumbleToAddress(context, address, lowFrequency, highFrequency)
+        if (descriptor != null && selection.shouldRemember) {
+            store.put(descriptor, selection.address)
+        }
+        return sendRumbleToAddress(context, selection.address, lowFrequency, highFrequency)
     }
 
     @JvmStatic fun stopRumble(context: Context): Boolean {
         val addresses = bridge?.getMatchingDeviceAddresses().orEmpty()
         val stopped = addresses.isNotEmpty() && addresses.all {
             sendRumbleToAddress(context, it, 0, 0)
-        }
-        synchronized(lock) {
-            fallbackAddressesByControllerNumber.clear()
         }
         return stopped
     }
@@ -128,21 +179,43 @@ object DirectEightBitDoUltimate2Bt {
         }.getOrNull()?.uppercase() ?: bluetoothAddressFromInputDescription(inputDevice.toString())
     }
 
-    private fun fallbackBluetoothAddress(controllerNumber: Short, addresses: List<String>): String? {
-        synchronized(lock) {
-            fallbackAddressesByControllerNumber.entries.removeAll { it.value !in addresses }
-            val address = fallbackAddressesByControllerNumber[controllerNumber]
-                ?: fallbackAddressForController(controllerNumber, addresses)?.also {
-                    fallbackAddressesByControllerNumber[controllerNumber] = it
-                    LimeLog.warning("Ultimate 2 Bluetooth rumble using fallback device mapping: " +
-                        "controller=$controllerNumber device=$it")
-                }
-            return address
+    internal fun selectTargetBluetoothAddress(
+        resolvedInputAddress: String?,
+        liveAddresses: List<String>,
+        ultimate2InputContextCount: Int,
+    ): String? = selectTargetBluetoothAddress(
+        resolvedInputAddress = resolvedInputAddress,
+        rememberedAddress = null,
+        liveAddresses = liveAddresses,
+        ultimate2InputContextCount = ultimate2InputContextCount,
+    )?.address
+
+    internal fun selectTargetBluetoothAddress(
+        resolvedInputAddress: String?,
+        rememberedAddress: String?,
+        liveAddresses: List<String>,
+        ultimate2InputContextCount: Int,
+    ): BluetoothAddressSelection? {
+        val exactAddress = resolvedInputAddress?.let { resolved ->
+            liveAddresses.firstOrNull { it.equals(resolved, ignoreCase = true) }
+        }
+        if (exactAddress != null) {
+            return BluetoothAddressSelection(exactAddress, BluetoothAddressSelectionSource.FRESH_EXACT)
+        }
+
+        val rememberedExactAddress = rememberedAddress?.let { remembered ->
+            liveAddresses.firstOrNull { it.equals(remembered, ignoreCase = true) }
+        }
+        if (rememberedExactAddress != null) {
+            return BluetoothAddressSelection(
+                rememberedExactAddress, BluetoothAddressSelectionSource.REMEMBERED_EXACT)
+        }
+
+        return liveAddresses.singleOrNull()?.takeIf { ultimate2InputContextCount == 1 }?.let {
+            BluetoothAddressSelection(it, BluetoothAddressSelectionSource.LONE_CONTROLLER_FALLBACK)
         }
     }
 
-    @JvmStatic internal fun fallbackAddressForController(
-        controllerNumber: Short,
-        addresses: List<String>,
-    ): String? = addresses.getOrNull(controllerNumber.toInt())
+    internal fun shouldRefreshBridge(proxyReady: Boolean, connectedDeviceName: String?): Boolean =
+        !proxyReady || connectedDeviceName == null
 }

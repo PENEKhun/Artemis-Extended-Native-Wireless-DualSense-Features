@@ -3740,6 +3740,14 @@ public class ControllerHandler implements InputManager.InputDeviceListener, UsbD
             vibrated = DualSenseBridge.sendRumble(lowFreqMotor, highFreqMotor);
         }
 
+        int ultimate2InputContextCount = 0;
+        for (int i = 0; i < inputDeviceContexts.size(); i++) {
+            if (DirectEightBitDoUltimate2Bt.isBluetoothUltimate2Input(
+                    inputDeviceContexts.valueAt(i).inputDevice)) {
+                ultimate2InputContextCount++;
+            }
+        }
+
         for (int i = 0; i < inputDeviceContexts.size(); i++) {
             InputDeviceContext deviceContext = inputDeviceContexts.valueAt(i);
 
@@ -3760,7 +3768,8 @@ public class ControllerHandler implements InputManager.InputDeviceListener, UsbD
 
                 if (DirectEightBitDoUltimate2Bt.isBluetoothUltimate2Input(deviceContext.inputDevice) &&
                         DirectEightBitDoUltimate2Bt.sendRumble(activityContext,
-                                controllerNumber, deviceContext.inputDevice, lowFreqMotor, highFreqMotor)) {
+                                deviceContext.inputDevice, ultimate2InputContextCount,
+                                lowFreqMotor, highFreqMotor)) {
                     vibrated = true;
                     continue;
                 }
